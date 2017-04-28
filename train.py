@@ -24,7 +24,7 @@ BATCH_SIZE = 10
 DATA_DIRECTORY = '/home/VOCdevkit'
 DATA_LIST_PATH = './dataset/train.txt'
 IGNORE_LABEL = 255
-INPUT_SIZE = '321,321'
+INPUT_SIZE = '473,473'
 LEARNING_RATE = 2.5e-4
 MOMENTUM = 0.9
 NUM_CLASSES = 21
@@ -85,6 +85,8 @@ def get_arguments():
                         help="Where to save snapshots of the model.")
     parser.add_argument("--weight-decay", type=float, default=WEIGHT_DECAY,
                         help="Regularisation parameter for L2-loss.")
+    parser.add_argument("--use-psp",type=bool,default=True,
+                        help='Wether use psp module')
     return parser.parse_args()
 
 def save(saver, sess, logdir, step):
@@ -141,7 +143,11 @@ def main():
         image_batch, label_batch = reader.dequeue(args.batch_size)
     
     # Create network.
-    net = DeepLabResNetModel({'data': image_batch}, is_training=args.is_training, num_classes=args.num_classes)
+    net = None
+    if args.use_psp:
+        net = DeepLabResNetPSPModel({'data': image_batch}, is_training=args.is_training, num_classes=args.num_classes)
+    else
+        net = DeepLabResNetModel({'data': image_batch}, is_training=args.is_training, num_classes=args.num_classes)
     # For a small batch size, it is better to keep 
     # the statistics of the BN layers (running means and variances)
     # frozen, and to not update the values provided by the pre-trained model. 
@@ -151,12 +157,21 @@ def main():
 
     # Predictions.
     raw_output = net.layers['fc1_voc12']
+    train_domain = None
+    if args.use_psp:
+        train_domain = 'conv5'
+    else
+        train_domain = 'fc'
+
+    print(raw_output.get_shape())
     # Which variables to load. Running means and variances are not trainable,
     # thus all_variables() should be restored.
-    restore_var = [v for v in tf.global_variables() if 'fc' not in v.name or not args.not_restore_last]
+    restore_var = [v for v in tf.global_variables() if train_domain not in v.name or not args.not_restore_last]
     all_trainable = [v for v in tf.trainable_variables() if 'beta' not in v.name and 'gamma' not in v.name]
-    fc_trainable = [v for v in all_trainable if 'fc' in v.name]
-    conv_trainable = [v for v in all_trainable if 'fc' not in v.name] # lr * 1.0
+    conv_trainable = [v for v in all_trainable if '' not in v.name] # lr * 1.0
+    if args.use_psp:
+
+    fc_trainable = [v for v in all_trainable if train_domain in v.name]
     fc_w_trainable = [v for v in fc_trainable if 'weights' in v.name] # lr * 10.0
     fc_b_trainable = [v for v in fc_trainable if 'biases' in v.name] # lr * 20.0
     assert(len(all_trainable) == len(fc_trainable) + len(conv_trainable))
