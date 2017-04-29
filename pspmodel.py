@@ -1,12 +1,6 @@
-
-# with the DeepLab-ResNet configuration.
-# The batch normalisation layer is provided by
-# the slim library (https://github.com/tensorflow/tensorflow/tree/master/tensorflow/contrib/slim).
-
 from kaffe.tensorflow import Network
 import tensorflow as tf
-
-class DeepLabResNetModel(Network):
+class DeepLabResNetPSPModel(Network):
     def setup(self, is_training, num_classes):
         '''Network definition.
 
@@ -398,22 +392,40 @@ class DeepLabResNetModel(Network):
         (self.feed('res5b_relu',
                    'bn5c_branch2c')
              .add(name='res5c')
-             .relu(name='res5c_relu')
-             .atrous_conv(3, 3, num_classes, 6, padding='SAME', relu=False, name='fc1_voc12_c0'))
+             .relu(name='res5c_relu'))
 
         (self.feed('res5c_relu')
-             .atrous_conv(3, 3, num_classes, 12, padding='SAME', relu=False, name='fc1_voc12_c1'))
+             .avg_pool(60,60,60,60,name = 'conv5_pool1')
+             .conv(1, 1, 512, 1, 1, biased=False, relu=False, name='conv5_3_pool1_conv')
+             .batch_normalization(is_training=is_training, activation_fn=tf.nn.relu, name='conv5_3_pool1_bn')
+             .bilinear(scale = 60,name = 'conv5_3_pool1_interp'))
 
         (self.feed('res5c_relu')
-             .atrous_conv(3, 3, num_classes, 18, padding='SAME', relu=False, name='fc1_voc12_c2'))
+             .avg_pool(30,30,30,30,name = 'conv5_pool2')
+             .conv(1, 1, 512, 1, 1, biased=False, relu=False, name='conv5_3_pool2_conv')
+             .batch_normalization(is_training=is_training, activation_fn=tf.nn.relu, name='conv5_3_pool2_bn')
+             .bilinear(scale = 30,name = 'conv5_3_pool2_interp'))
 
         (self.feed('res5c_relu')
-             .atrous_conv(3, 3, num_classes, 24, padding='SAME', relu=False, name='fc1_voc12_c3'))
+             .avg_pool(20,20,20,20,name = 'conv5_pool3')
+             .conv(1, 1, 512, 1, 1, biased=False, relu=False, name='conv5_3_pool3_conv')
+             .batch_normalization(is_training=is_training, activation_fn=tf.nn.relu, name='conv5_3_pool3_bn')
+             .bilinear(scale = 20,name = 'conv5_3_pool3_interp'))
 
-        (self.feed('fc1_voc12_c0',
-                   'fc1_voc12_c1',
-                   'fc1_voc12_c2',
-                   'fc1_voc12_c3')
-             .add(name='fc1_voc12'))
-
-
+        (self.feed('res5c_relu')
+             .avg_pool(10,10,10,10,name = 'conv5_pool6')
+             .conv(1, 1, 512, 1, 1, biased=False 	, relu=False, name='conv5_3_pool6_conv')
+             .batch_normalization(is_training=is_training, activation_fn=tf.nn.relu, name='conv5_3_pool6_bn')
+             .bilinear(scale = 10,name = 'conv5_3_pool6_interp'))
+        
+        (self.feed( 'res5c_relu',
+        			'conv5_3_pool1_interp',
+        			'conv5_3_pool2_interp',
+        			'conv5_3_pool3_interp',
+        			'conv5_3_pool6_interp')
+             .concat(3,name = 'conv5_3_concat')
+             .conv(3, 3, 512, 1, 1, biased=False 	, relu=False, name='conv5_4')
+             .batch_normalization(is_training=is_training, activation_fn=tf.nn.relu, name='conv5_4_bn')
+             .dropout(0.9,name = 'conv5_4_dropout')
+             .conv(1,1,num_classes,1,1,biased= True,relu= False,name = 'conv5_5')
+             .bilinear(scale = 8,name = 'fc1_voc12'))
