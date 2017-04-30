@@ -16,6 +16,7 @@ import tensorflow as tf
 import numpy as np
 
 from deeplab_resnet import DeepLabResNetModel, ImageReader, prepare_label
+from pspmodel import DeepLabResNetPSPModel
 
 IMG_MEAN = np.array((104.00698793,116.66876762,122.67891434), dtype=np.float32)
 
@@ -45,6 +46,10 @@ def get_arguments():
                         help="Number of images in the validation set.")
     parser.add_argument("--restore-from", type=str, default=RESTORE_FROM,
                         help="Where restore model parameters from.")
+    parser.add_argument("--use-psp", type=int, default=1,
+                        help="Wether use psp module")
+    parser.add_argument("--output-layer", type=str, default='conv5_5',
+                        help="deeplabe:fc1_voc12,psp:conv5_5")
     return parser.parse_args()
 
 def load(saver, sess, ckpt_path):
@@ -67,10 +72,9 @@ def main():
     
     # Load reader.
     with tf.name_scope("create_inputs"):
-        reader = ImageReader(
-            args.data_dir,
+        reader = ImageReader( args.data_dir,
             args.data_list,
-            None, # No defined input size.
+            (473,473), # No defined input size.
             False, # No random scale.
             False, # No random mirror.
             args.ignore_label,
@@ -78,15 +82,21 @@ def main():
             coord)
         image, label = reader.image, reader.label
     image_batch, label_batch = tf.expand_dims(image, dim=0), tf.expand_dims(label, dim=0) # Add one batch dimension.
+        
 
     # Create network.
-    net = DeepLabResNetModel({'data': image_batch}, is_training=False, num_classes=args.num_classes)
+    if args.use_psp == 1:
+        print('load psp net')
+        net = DeepLabResNetPSPModel({'data': image_batch}, is_training=False, num_classes=args.num_classes)
+    else:
+        net = DeepLabResNetModel({'data': image_batch}, is_training=False, num_classes=args.num_classes)
 
     # Which variables to load.
     restore_var = tf.global_variables()
     
     # Predictions.
-    raw_output = net.layers['fc1_voc12']
+    raw_output = net.layers[args.output_layer]
+    print(raw_output.get_shape())
     raw_output = tf.image.resize_bilinear(raw_output, tf.shape(image_batch)[1:3,])
     raw_output = tf.argmax(raw_output, dimension=3)
     pred = tf.expand_dims(raw_output, dim=3) # Create 4-d tensor.

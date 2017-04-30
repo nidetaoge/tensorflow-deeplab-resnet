@@ -88,11 +88,13 @@ def get_arguments():
                         help="Regularisation parameter for L2-loss.")
     parser.add_argument("--use-psp",type=bool,default=True,
                         help='Wether use psp module')
+    parser.add_argument("--output_layer", type=str, default='conv5_5',
+                        help="output layer deeplab:fc1_voc12 psp:conv5_5")
+
     return parser.parse_args()
 
 def save(saver, sess, logdir, step):
    '''Save weights.
-
    Args:
      saver: TensorFlow Saver object.
      sess: TensorFlow session.
@@ -157,7 +159,7 @@ def main():
     # if they are presented in var_list of the optimiser definition.
 
     # Predictions.
-    raw_output = net.layers['fc1_voc12']
+    raw_output = net.layers[args.output_layer]
     train_domain = None
     if args.use_psp:
         train_domain = 'conv5'

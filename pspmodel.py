@@ -398,25 +398,25 @@ class DeepLabResNetPSPModel(Network):
              .avg_pool(60,60,60,60,name = 'conv5_pool1')
              .conv(1, 1, 512, 1, 1, biased=False, relu=False, name='conv5_3_pool1_conv')
              .batch_normalization(is_training=is_training, activation_fn=tf.nn.relu, name='conv5_3_pool1_bn')
-             .bilinear(scale = 60,name = 'conv5_3_pool1_interp'))
+             .bilinear(60,60,name = 'conv5_3_pool1_interp'))
 
         (self.feed('res5c_relu')
              .avg_pool(30,30,30,30,name = 'conv5_pool2')
              .conv(1, 1, 512, 1, 1, biased=False, relu=False, name='conv5_3_pool2_conv')
              .batch_normalization(is_training=is_training, activation_fn=tf.nn.relu, name='conv5_3_pool2_bn')
-             .bilinear(scale = 30,name = 'conv5_3_pool2_interp'))
+             .bilinear(60,60,name = 'conv5_3_pool2_interp'))
 
         (self.feed('res5c_relu')
              .avg_pool(20,20,20,20,name = 'conv5_pool3')
              .conv(1, 1, 512, 1, 1, biased=False, relu=False, name='conv5_3_pool3_conv')
              .batch_normalization(is_training=is_training, activation_fn=tf.nn.relu, name='conv5_3_pool3_bn')
-             .bilinear(scale = 20,name = 'conv5_3_pool3_interp'))
+             .bilinear(60,60,name = 'conv5_3_pool3_interp'))
 
         (self.feed('res5c_relu')
              .avg_pool(10,10,10,10,name = 'conv5_pool6')
              .conv(1, 1, 512, 1, 1, biased=False 	, relu=False, name='conv5_3_pool6_conv')
              .batch_normalization(is_training=is_training, activation_fn=tf.nn.relu, name='conv5_3_pool6_bn')
-             .bilinear(scale = 10,name = 'conv5_3_pool6_interp'))
+             .bilinear(60,60,name = 'conv5_3_pool6_interp'))
         
         (self.feed( 'res5c_relu',
         			'conv5_3_pool1_interp',
@@ -427,5 +427,4 @@ class DeepLabResNetPSPModel(Network):
              .conv(3, 3, 512, 1, 1, biased=False 	, relu=False, name='conv5_4')
              .batch_normalization(is_training=is_training, activation_fn=tf.nn.relu, name='conv5_4_bn')
              .dropout(0.9,name = 'conv5_4_dropout')
-             .conv(1,1,num_classes,1,1,biased= True,relu= False,name = 'conv5_5')
-             .bilinear(scale = 8,name = 'fc1_voc12'))
+             .conv(1,1,num_classes,1,1,biased= True,relu= False,name = 'conv5_5'))
