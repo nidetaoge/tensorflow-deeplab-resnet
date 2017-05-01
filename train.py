@@ -12,6 +12,7 @@ from datetime import datetime
 import os
 import sys
 import time
+from tqdm import tqdm
 
 import tensorflow as tf
 import numpy as np
@@ -29,7 +30,7 @@ INPUT_SIZE = '473,473'
 LEARNING_RATE = 2.5e-4
 MOMENTUM = 0.9
 NUM_CLASSES = 21
-NUM_STEPS = 20001
+NUM_STEPS = 200001
 POWER = 0.9
 RANDOM_SEED = 1234
 RESTORE_FROM = './deeplab_resnet.ckpt'
@@ -37,6 +38,8 @@ SAVE_NUM_IMAGES = 2
 SAVE_PRED_EVERY = 1000
 SNAPSHOT_DIR = './snapshots/'
 WEIGHT_DECAY = 0.0005
+EPOCH = 30
+START_EPOCH = 0
 
 
 def get_arguments():
@@ -90,6 +93,10 @@ def get_arguments():
                         help='Wether use psp module')
     parser.add_argument("--output_layer", type=str, default='conv5_5',
                         help="output layer deeplab:fc1_voc12 psp:conv5_5")
+    parser.add_argument("--epoch", type=int, default=EPOCH,
+                        help="train epoch")
+    parser.add_argument("--start-epoch", type=int, default=START_EPOCH,
+                        help="start train epoch")
 
     return parser.parse_args()
 
@@ -123,6 +130,7 @@ def load(saver, sess, ckpt_path):
 def main():
     """Create the model and start the training."""
     args = get_arguments()
+    train_data_size = 0
 
     h, w = map(int, args.input_size.split(','))
     input_size = (h, w)
@@ -144,6 +152,7 @@ def main():
             IMG_MEAN,
             coord)
         image_batch, label_batch = reader.dequeue(args.batch_size)
+        train_data_size = reader.train_data_size()
 
     # Create network.
     net = None
@@ -169,8 +178,8 @@ def main():
     print(raw_output.get_shape())
     # Which variables to load. Running means and variances are not trainable,
     # thus all_variables() should be restored.
-    #restore_var = [v for v in tf.global_variables() if train_domain not in v.name or not args.not_restore_last]
-    restore_var = [v for v in tf.global_variables() if train_domain not in v.name ]
+    restore_var = [v for v in tf.global_variables() if train_domain not in v.name or not args.not_restore_last]
+    #restore_var = [v for v in tf.global_variables() if train_domain not in v.name ]
     print(restore_var)
     print(train_domain)
     all_trainable = [v for v in tf.trainable_variables() if 'beta' not in v.name and 'gamma' not in v.name]
@@ -252,22 +261,30 @@ def main():
 
     # Start queue threads.
     threads = tf.train.start_queue_runners(coord=coord, sess=sess)
+    log_path = os.path.join(args.snapshot_dir,'error.log') 
+    log_file = open(log_path,'w')
 
     # Iterate over training steps.
-    for step in range(args.num_steps):
-        start_time = time.time()
-        feed_dict = { step_ph : step }
-
-        if step % args.save_pred_every == 0:
-            loss_value, images, labels, preds, summary, _ = sess.run([reduced_loss, image_batch, label_batch, pred, total_summary, train_op], feed_dict=feed_dict)
-            summary_writer.add_summary(summary, step)
-            save(saver, sess, args.snapshot_dir, step)
-        else:
-            loss_value, _ = sess.run([reduced_loss, train_op], feed_dict=feed_dict)
-        duration = time.time() - start_time
-        print('step {:d} \t loss = {:.3f}, ({:.3f} sec/step)'.format(step, loss_value, duration))
+    for epoch in xrange(args.start_epoch,args.epoch):
+        epoch_loss = 0
+        epoch_time = 0
+        for step in tqdm(range(train_data_size/args.batch_size)):
+            start_time = time.time()
+            feed_dict = { step_ph : step+train_data_size*epoch }
+            if (step+train_data_size*epoch) % args.save_pred_every == 0:
+                loss_value, images, labels, preds, summary, _ = sess.run([reduced_loss, image_batch, label_batch, pred, total_summary, train_op], feed_dict=feed_dict)
+                summary_writer.add_summary(summary, step+train_data_size*epoch)
+                save(saver, sess, args.snapshot_dir, step+train_data_size*epoch)
+            else:
+                loss_value, _ = sess.run([reduced_loss, train_op], feed_dict=feed_dict)
+            duration = time.time() - start_time
+            epoch_loss += loss_value
+            epoch_time += duration
+        print('epoch {:d}|{:d} \t loss = {:.3f}, ({:.3f} sec/step)'.format(epoch,args.epoch-args.start_epoch, epoch_loss*args.batch_size/train_data_size, epoch_time))
+        log_file.write(str(epoch_loss*args.batch_size/train_data_size)+'\n')
     coord.request_stop()
     coord.join(threads)
+    log_file.close()
 
 if __name__ == '__main__':
     main()

@@ -48,7 +48,7 @@ def get_arguments():
                         help="Where restore model parameters from.")
     parser.add_argument("--use-psp", type=int, default=1,
                         help="Wether use psp module")
-    parser.add_argument("--output-layer", type=str, default='conv5_5',
+    parser.add_argument("--output-layer", type=str, default='fc1_voc12',
                         help="deeplabe:fc1_voc12,psp:conv5_5")
     return parser.parse_args()
 

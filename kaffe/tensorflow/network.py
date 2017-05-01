@@ -274,9 +274,6 @@ class Network(object):
         keep = 1 - self.use_dropout + (self.use_dropout * keep_prob)
         return tf.nn.dropout(input, keep, name=name)
     @layer
-    def bilinear(self,input,scale,name):
-        input_shape = input.get_shape()
-        new_height = input_shape[1]*scale
-        new_width = input_shape[2]*scale
+    def bilinear(self,input,new_height,new_width,name):
         inference = tf.image.resize_bilinear(input,tf.stack([new_height,new_width]),name = name)
         return inference
